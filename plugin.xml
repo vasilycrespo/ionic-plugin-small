@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0" xmlns:android="http://schemas.android.com/apk/res/android" id="cordova-plugin-robart-iot" version="0.0.1">
+   <name>RobartIoTCordovaPlugin</name>
+   <js-module name="RobartIoTCordovaPlugin" src="www/RobartIoTCordovaPlugin.js">
+      <clobbers target="RobartIoTCordovaPlugin" />
+   </js-module>
+   <platform name="android">
+      <config-file parent="/*" target="res/xml/config.xml">
+         <feature name="RobartIoTCordovaPlugin">
+            <param name="android-package" value="cordova.plugin.robart.iot.RobartIoTCordovaPlugin" />
+         </feature>
+      </config-file>
+      <config-file parent="/*" target="AndroidManifest.xml" />
+      <source-file src="src/android/RobartIoTCordovaPlugin.java" target-dir="src/cordova-plugin-robart-iot/RobartIoTCordovaPlugin" />
+   </platform>
+   <platform name="ios">
+      <config-file parent="/*" target="config.xml">
+         <feature name="RobartIoTCordovaPlugin">
+            <param name="ios-package" value="RobartIoTCordovaPlugin" />
+         </feature>
+      </config-file>
+      <source-file src="src/ios/RobartIoTCordovaPlugin.m" />
+   </platform>
+</plugin>
