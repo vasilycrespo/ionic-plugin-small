@@ -17,7 +17,7 @@ exports.startRobotDiscovery = function(arg0, success, error) {
 };
 
 exports.btRobotDisconnect = function(arg0, success, error) {
-    exec(success, error, "RobartIoTCordovaPlugin", "startRobotDiscovery", [arg0]);
+    exec(success, error, "RobartIoTCordovaPlugin", "btRobotDisconnect", [arg0]);
 };
 
 exports.connectToWifi = function(arg0, success, error) {
