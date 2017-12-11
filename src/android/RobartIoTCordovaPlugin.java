@@ -187,38 +187,6 @@ class ConfigurationData {
         this.instance = instance;
     }
 
-    public void initServerOld(RobartIoTCordovaPlugin instance) {
-        if (this.robotIotConfiguration != null) {
-            return;
-        }
-
-        try {
-            System.out.println("InitServer, robotIotConfiguration");
-
-            RobartSDK.initialize(instance.cordova.getActivity().getApplicationContext());
-
-
-            RobartSDK.initialize(instance.cordova.getActivity().getApplicationContext());
-            robotIotConfiguration = RobotIotConfiguration.builder()
-                    .setHost(serverEndpoint)
-                    .setParts("iot")
-                    .setPort(443)
-                    .setStrategy(Strategy.HTTPS)
-                    .build();
-
-            this.iotManager = new IotManagerImpl(robotIotConfiguration);
-/*
-            this.robotIotConfiguration = ServerConfiguration.builder().hostUrl(serverEndpoint).parts("iot")
-                    .port(443).strategy(Strategy.https).build();
-            this.iotManager = new IotManagerImpl(this.robotIotConfiguration);
-            this.instance = instance;
-            AICUConnector.init(this.robotIotConfiguration);
- */
-        } catch (Exception e) {
-            System.out.println("Exception thrown in initializing the app" + e.getMessage());
-        }
-    }
-
     public void initServer(RobartIoTCordovaPlugin instance) {
         if (this.robotIotConfiguration != null) {
             return;
@@ -236,15 +204,9 @@ class ConfigurationData {
                     .build();
 
             this.iotManager = new IotManagerImpl(robotIotConfiguration);
-            /*
-             RobartSDK.initialize(instance.cordova.getActivity().getApplicationContext());
 
-            this.robotIotConfiguration = ServerConfiguration.builder().hostUrl(serverEndpoint).parts("iot")
-                    .port(443).strategy(Strategy.https).build();
-            this.iotManager = new IotManagerImpl(this.robotIotConfiguration);
             this.instance = instance;
-            AICUConnector.init(this.robotIotConfiguration);
-             */
+
         } catch (Exception e) {
             System.out.println("Exception thrown in initializing the app" + e.getMessage());
         }
