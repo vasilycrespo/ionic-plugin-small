@@ -7,7 +7,21 @@ import io.reactivex.SingleSource;
 import io.reactivex.disposables.Disposable;
 import org.reactivestreams.Publisher;
 import io.reactivex.functions.Function;
+import android.text.TextUtils;
+import cc.robart.aicu.android.sdk.encryption.SecurePreferences;
+
+import java.io.IOException;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.UnrecoverableEntryException;
+import java.security.cert.CertificateException;
+import javax.crypto.NoSuchPaddingException;
+
 import static cc.robart.bluetooth.sdk.core.BluetoothDeviceState.STATE_CONNECTED;
+
 import cc.robart.bluetooth.sdk.exceptions.RobBleCoreException;
 
 import cc.robart.aicu.android.sdk.factory.AICUConnector;
@@ -187,6 +201,7 @@ class ConfigurationData {
         this.instance = instance;
     }
 
+
     public void initServer(RobartIoTCordovaPlugin instance) {
         if (this.robotIotConfiguration != null) {
             return;
@@ -206,7 +221,6 @@ class ConfigurationData {
             this.iotManager = new IotManagerImpl(robotIotConfiguration);
 
             this.instance = instance;
-
         } catch (Exception e) {
             System.out.println("Exception thrown in initializing the app" + e.getMessage());
         }
@@ -278,13 +292,10 @@ public class RobartIoTCordovaPlugin extends CordovaPlugin {
     private void btRobotDisconnect(String message, CallbackContext callbackContext) {
         System.out.println("BtRobotDisconnect. Calling : " + message);
 
-        getClient().disconnectFromRobot().subscribe(aBoolean -> System.out.println("disconnectFromRobot() called: " + aBoolean),
-                RxExceptions::propagate);
+        getClient().disconnectFromRobot()
+                .subscribe(aBoolean -> System.out.println("disconnectFromRobot() called: " + aBoolean),
+                        throwable -> System.out.println("disconnected:" + throwable.getMessage()));
 
-        getClient().addDisconnectCallback(() -> {
-            callbackContext.success("{}");
-            System.out.println("disconnected");
-        });
     }
 
     public BluetoothClient getClient() {
@@ -299,6 +310,7 @@ public class RobartIoTCordovaPlugin extends CordovaPlugin {
         }
         return rxBleClient;
     }
+
     private Disposable connection;
 
     public void connectDevice(String macAddress, CallbackContext callbackContext) {
@@ -403,12 +415,21 @@ public class RobartIoTCordovaPlugin extends CordovaPlugin {
 
 
     private void addDisconnectCallback() {
-        getClient().addDisconnectCallback(() -> {
-            if (connection != null) {
-                connection.dispose();
-                connection = null;
+        getClient().addDisconnectCallback(new BluetoothClient.DisconnectCallback() {
+            @Override
+            public void disconnected() {
+
+                System.out.println("disconnected");
+                if (connection != null) {
+                    connection.dispose();
+                    connection = null;
+                }
             }
-            System.out.println("disconnected");
+
+            @Override
+            public void disconnecting() {
+                System.out.println("disconnecting");
+            }
         });
     }
 
@@ -470,6 +491,7 @@ public class RobartIoTCordovaPlugin extends CordovaPlugin {
             return true;
         }
 
+
         if (action.equals("connectRobot")) {
             this.connectRobot(message, callbackContext);
             return true;
@@ -511,6 +533,7 @@ public class RobartIoTCordovaPlugin extends CordovaPlugin {
         }
 
         if (action.equals("robotGetRobotId")) {
+
             this.robotGetRobotId(message, callbackContext);
             return true;
         }
@@ -662,74 +685,6 @@ public class RobartIoTCordovaPlugin extends CordovaPlugin {
 
         return false;
     }
-
-    //ORIGINAL INSTALL MAKE SURE INSTALL FIRMWARE HAS EVERYTHING
-    /*private void installFirmware(String message, CallbackContext callbackContext) {`
-        System.out.println("Firmwareupdate. Started");
-        // Se puede verificar si se decargo usando: SDKUtils.isFirmwareStored
-        String robotId = RobartSDKFactory.getDefaultAICUConnector().getCurrentRobotId();
-        System.out.println("Firmwareupdate, finding robot in IM mode: " + robotId);
-        AICUConnector.findRobots(new RobotDiscoveryListener() {
-            @Override
-            public void onDiscoveredRobot(final Robot r) {
-                System.out.println("Firmwareupdate, onDiscoveredRobot, found a robot: " + r);
-
-                if (r.getUniqueId().equals(robotId)) {
-                  System.out.println("Firmwareupdate, onDiscoveredRobot, calling connectToRobot");
-
-                  RobartSDKFactory.connectToRobot(r, new ConnectionListener() {
-                      @Override
-                      public void onConnect() {
-                          System.out.println("Firmwareupdate, onDiscoveredRobot, connected to the robot");
-
-                          // String uniqueId = RobartSDKFactory.getDefaultAICUConnector().getCurrentRobotId();
-                          System.out.println("Firmwareupdate, InstallFirmware: " + robotId);
-
-                          RobartSDKFactory.getDefaultAICUConnector().sendCommand(new InstallFirmware(robotId, new RequestCallback() {
-                              @Override
-                              public void onSuccess() {
-                                System.out.println("Firmwareupdate, connectToRobot, InstallFirmware, success");
-                                String response = ("{'success': true}").replaceAll("'", "\"");
-                                System.out.println("Firmwareupdate. Response : " + response);
-                                callbackContext.success(response);
-                                    }
-                              @Override
-                              public void onAuthenticationError(AuthenticationException ex) {
-                                  System.out.println("Firmwareupdate, onAuthenticationError, " + ex.getMessage());
-                              }
-                              @Override
-                              public void onConnectionError(ConnectionException ex) {
-                                  System.out.println("Firmwareupdate, onConnectionError, " + ex.getMessage());
-                              }
-                              @Override
-                              public void onRequestError(RequestException e) {
-                                  System.out.println("Firmwareupdate, onRequestError, " + e.getMessage());
-                              }
-                          }));
-                      }
-                      @Override
-                      public void onDisconnect() {
-                        System.out.println("Firmwareupdate, onDisconnect, the SDK was disconnected of the Robot");
-                      }
-                      @Override
-                      public void onConnectionError(final Exception exception) {
-                        System.out.println("Firmwareupdate, onConnectionError, " + exception.getMessage());
-                      }
-                      @Override
-                      public void onAuthenticationError(final AuthenticationException exception) {
-                        System.out.println("Firmwareupdate, onAuthenticationError, " + exception.getMessage());
-                      }
-                    });
-                } else {
-                  System.out.println("Firmwareupdate, found other robot: " +  r.toString());
-                }
-            }
-            @Override
-            public void onDiscoveredRobotUpdate(final Robot r) {
-                    System.out.println("Firmwareupdate, onDiscoveredRobotUpdate: " + r.toString());
-            }
-        });
-    }*/
 
     private void installFirmware(String message, CallbackContext callbackContext) {
         
@@ -2279,7 +2234,7 @@ public class RobartIoTCordovaPlugin extends CordovaPlugin {
         }));
     }
 
-    private void getRobotID(String message, CallbackContext callbackContext) {
+    private void getRobotIDV2(String message, CallbackContext callbackContext) {
         System.out.println("GetRobotID. Started.");
         RobartIoTCordovaPlugin plugin = this;
 
@@ -2368,6 +2323,74 @@ public class RobartIoTCordovaPlugin extends CordovaPlugin {
                     System.out.println("GetRobotID #10, disconnected");
                 }
             });
+
+        } catch (Exception e2) {
+            System.out.println("GetRobotID. AICUConnector.init Exception " + e2.getMessage());
+            errorHandler("GetRobotID #11", e2, callbackContext);
+        }
+    }
+
+    private void getRobotID(String message, CallbackContext callbackContext) {
+        System.out.println("GetRobotID. Started.");
+        RobartIoTCordovaPlugin plugin = this;
+
+        if (plugin.robot == null) {
+            System.out.println("GetRobotID. Robot is null");
+            errorHandler("GetRobotID #0", new Exception("GetRobotID. Robot is null"), callbackContext);
+        } else {
+            System.out.println("GetRobotID. Robot: " + plugin.robot.getUniqueId());
+        }
+
+        try {
+
+            RobartSDKFactory.getDefaultAICUConnector().sendCommand(new GetRobotIDRobotCommand(new RequestCallbackWithResult<Robot>() {
+                @Override
+                public void onSuccess(final Robot result1) {
+                    RobartSDKFactory.getDefaultAICUConnector().sendCommand(new GetRobotNameRobotCommand(new RequestCallbackWithResult<String>() {
+                        @Override
+                        public void onSuccess(final String result2) {
+                            System.out.println("GetRobotID. Success response of the GetRobotNameRobotCommand method");
+                            String response = String.format(
+                                    "{'name': '%s', 'unique_id': '%s', 'camlas_unique_id': '%s', 'model': '%s', 'firmware': '%s'}",
+                                    result2, result1.getUniqueId().toString(), result1.getUniqueId().toString(),
+                                    result1.getModel().toString(), result1.getFirmware().toString());
+
+                            System.out.println("GetRobotID. Response: " + response);
+                            callbackContext.success(response.replaceAll("'", "\""));
+                        }
+
+                        @Override
+                        public void onAuthenticationError(AuthenticationException ex) {
+                            errorHandler("GetRobotID #1", ex, callbackContext);
+                        }
+
+                        @Override
+                        public void onConnectionError(ConnectionException ex) {
+                            errorHandler("GetRobotID #2", ex, callbackContext);
+                        }
+
+                        @Override
+                        public void onRequestError(RequestException ex) {
+                            errorHandler("GetRobotID #3", ex, callbackContext);
+                        }
+                    }));
+                }
+
+                @Override
+                public void onAuthenticationError(AuthenticationException ex) {
+                    errorHandler("GetRobotID #4", ex, callbackContext);
+                }
+
+                @Override
+                public void onConnectionError(ConnectionException ex) {
+                    errorHandler("GetRobotID #5", ex, callbackContext);
+                }
+
+                @Override
+                public void onRequestError(RequestException ex) {
+                    errorHandler("GetRobotID #6", ex, callbackContext);
+                }
+            }));
 
         } catch (Exception e2) {
             System.out.println("GetRobotID. AICUConnector.init Exception " + e2.getMessage());
@@ -2574,16 +2597,49 @@ public class RobartIoTCordovaPlugin extends CordovaPlugin {
 
             this.configurationData = new ConfigurationData(iotUserLogin, robotUid, robotPassword, serverEndpoint,
                     robotEndpoint, stsk);
+            System.out.println("iot user login found:" + iotUserLogin);
+            if (isUserInPrefs(iotUserLogin)) {
 
-            this.configurationData.initServer(this);
-            this.configurationData.getIotManager().registerDevice(this.configurationData.getStsk(), this.configurationData.getIotUserLogin()).subscribe(
-                    onRegisterDeviceSuccess(message, callbackContext, this.configurationData),
-                    onRegisterDeviceError(message, callbackContext));
+                System.out.println("checking paired robots for user:" + iotUserLogin);
+
+                this.configurationData.initServer(this);
+                this.configurationData.getIotManager().checkPairedRobots(iotUserLogin).subscribe(
+                        getCheckPairingOnNext(message, callbackContext, configurationData),
+                        getCheckPairingOnError(message, callbackContext, configurationData));
+
+                //this.configurationData.getIotManager().
+            } else {
+
+                System.out.println("start with register device.");
+
+                this.configurationData.initServer(this);
+                this.configurationData.getIotManager().registerDevice(this.configurationData.getStsk(), this.configurationData.getIotUserLogin()).subscribe(
+                        onRegisterDeviceSuccess(message, callbackContext, this.configurationData),
+                        onRegisterDeviceError(message, callbackContext));
+            }
+
+        }
+    }
+
+    private boolean isUserInPrefs(String iotUserLogin) {
+        try {
+
+            return !TextUtils.isEmpty(iotUserLogin) && SecurePreferences.getSharedPreferences(this.cordova.getActivity().getApplicationContext()).contains(iotUserLogin);
+        } catch (IOException | CertificateException |
+                InvalidKeyException |
+                NoSuchPaddingException |
+                KeyStoreException |
+                NoSuchProviderException |
+                NoSuchAlgorithmException |
+                InvalidAlgorithmParameterException |
+                UnrecoverableEntryException e) {
+            System.out.println("exception being thrown in feching user:" + e);
+            return false;
         }
     }
 
     private Consumer<? super KeyValuePair> onRegisterDeviceSuccess(String message, CallbackContext callbackContext,
-                                                           ConfigurationData cData) {
+                                                                   ConfigurationData cData) {
         return new Consumer<KeyValuePair>() {
             @Override
             public void accept(@NonNull KeyValuePair user) throws Exception {
@@ -2625,7 +2681,7 @@ public class RobartIoTCordovaPlugin extends CordovaPlugin {
 
             this.schedulePairingInitialize(message, callbackContext, cData);
             // cData.getRobartIoTCordovaPluginInstance().errorHandler("GetInitPairingOnError", new Exception(throwable),
-            // 		callbackContext);
+            //      callbackContext);
         };
     }
 
@@ -2635,17 +2691,40 @@ public class RobartIoTCordovaPlugin extends CordovaPlugin {
             System.out.println("Pairing, response from server: " + responsePS.getResponse());
 
             if (responsePS.getResponse().equals("already paired") || responsePS == PairingStatus.ALREADY_PAIRED) {
-                cData.getIotManager().checkPairedRobots(cData.getIotUserLogin()).subscribe(
-                        getCheckPairingOnNext(message, callbackContext, cData),
-                        getCheckPairingOnError(message, callbackContext, cData));
+                getClient().finalizePairing()
+                        .delay(10, TimeUnit.SECONDS)
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(new Consumer<Boolean>() {
+                            @Override
+                            public void accept(Boolean aBoolean) throws Exception {
+                                System.out.println("finalize pairing success. connecting to robot.");
+                                //System.out.println("robot:" + plugin.robot);
+
+                                checkPairedRobots(message, callbackContext, cData);
+
+                                //connectToRobot(plugin.robot, cData, callbackContext, message);
+                            }
+                        }, new Consumer<Throwable>() {
+                            @Override
+                            public void accept(Throwable throwable) throws Exception {
+                                System.out.println("exception in finalize pairing");
+                            }
+                        });
             } else {
                 schedulePairingCheck(message, callbackContext, cData);
             }
         };
     }
 
+    private void checkPairedRobots(String message, CallbackContext callbackContext, cordova.plugin.robart.iot.ConfigurationData cData) {
+        cData.getIotManager().checkPairedRobots(cData.getIotUserLogin()).subscribe(
+                getCheckPairingOnNext(message, callbackContext, cData),
+                getCheckPairingOnError(message, callbackContext, cData));
+    }
+
     private void schedulePairingCheck(String message, CallbackContext callbackContext, ConfigurationData cData) {
-        cData.getIotManager().checkPairedStatus(cData.getIotUserLogin(), cData.getRobotUid())
+        cData.getIotManager()
+                .checkPairedStatus(cData.getIotUserLogin(), cData.getRobotUid())
                 .subscribe(getPairedStatusOnNext(message, callbackContext, cData), getPairedStatusOnError(message, callbackContext, cData));
     }
 
@@ -2653,9 +2732,26 @@ public class RobartIoTCordovaPlugin extends CordovaPlugin {
         return (Consumer<PairingStatus>) val -> {
             System.out.println("Pairing, status:" + val.getResponse());
 
-            cData.getIotManager().checkPairedRobots(cData.getIotUserLogin()).subscribe(
-                    getCheckPairingOnNext(message, callbackContext, cData),
-                    getCheckPairingOnError(message, callbackContext, cData));
+            getClient().finalizePairing()
+                    .delay(10, TimeUnit.SECONDS)
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(new Consumer<Boolean>() {
+                        @Override
+                        public void accept(Boolean aBoolean) throws Exception {
+                            System.out.println("finalize pairing success. connecting to robot.");
+                            //System.out.println("robot:" + plugin.robot);
+
+                            checkPairedRobots(message, callbackContext, cData);
+
+                            //connectToRobot(plugin.robot, cData, callbackContext, message);
+                        }
+                    }, new Consumer<Throwable>() {
+                        @Override
+                        public void accept(Throwable throwable) throws Exception {
+                            System.out.println("exception in finalize pairing");
+                        }
+                    });
+
         };
     }
 
@@ -2677,7 +2773,7 @@ public class RobartIoTCordovaPlugin extends CordovaPlugin {
             System.out.println("Pairing, getPairingStatus error occured: " + throwable1.getMessage());
             System.out.println("Pairing, this error is because the robot is already paired, so, FinalizePairing is started");
 
-            cData.getRobartIoTCordovaPluginInstance().finalizePairing();
+            //cData.getRobartIoTCordovaPluginInstance().finalizePairing();
             callbackContext.error("{'error': 'Check the console'}".replaceAll("'", "\""));
         };
     }
@@ -2702,69 +2798,92 @@ public class RobartIoTCordovaPlugin extends CordovaPlugin {
                 }
             }
 
+            String user = ((RobotIotConfiguration) currElem.getConfiguration()).getUser();
+            System.out.println("user login:" + user);
+            String host = currElem.getConfiguration().getHost();
+            System.out.println("host name for configuration:" + host);
+            String toString = currElem.getConfiguration().toString();
+            System.out.println("configuration toString():" + toString);
+
+
+            String className = currElem.getConfiguration().getClass().getName();
+            System.out.println("class name for configuration:" + className);
+
             if (paired) {
                 System.out.println("Pairing, success, the robot is paired");
                 // cData.getRobartIoTCordovaPluginInstance().finalizePairing();
-                RobartIoTCordovaPlugin plugin = cData.getRobartIoTCordovaPluginInstance();
+                final RobartIoTCordovaPlugin plugin = cData.getRobartIoTCordovaPluginInstance();
                 cData.initServer(plugin);
-
                 plugin.robot = currElem;
-                RobartSDKFactory.connectToRobot(currElem, new ConnectionListener() {
-                    @Override
-                    public void onConnect() {
-                        System.out.println("Pairing, Connected to the robot #2, FinalizePairing started");
-                        RobartSDK.initialize(cData.getRobartIoTCordovaPluginInstance().cordova.getActivity().getApplicationContext());
 
-                        if (plugin.firstTimeConfiguration) {
-                            getClient().finalizePairing().subscribe(aBoolean -> {
-                                System.out.println("Pairing, success on finalizing Pairing: " + aBoolean);
-                                cData.getRobartIoTCordovaPluginInstance().justPaired = true;
-                                cData.initServer(cData.getRobartIoTCordovaPluginInstance());
-                                //AICUConnector.stopFindRobot();
-                                plugin.configureTime(message, callbackContext);
-                                callbackContext.success("{'response': 'Connected to the robot'}".replaceAll("'", "\""));
-                            }, throwable -> {
-                                System.out.println("Pairing, error on finalizing Paring: " + throwable.getMessage());
-                            });
-                        } else {
-                            cData.initServer(cData.getRobartIoTCordovaPluginInstance());
-                            plugin.configureTime(message, callbackContext);
-                            callbackContext.success("{'response': 'Connected to the robot'}".replaceAll("'", "\""));
-                        }
-                    }
+                connectToRobot(plugin.robot, cData, callbackContext, message);
 
-                    @Override
-                    public void onConnectionError(final Throwable exception) {
-                        System.out.println("Pairing, exception: " + exception.getMessage());
-                        callbackContext
-                                .error("{'error': 'exception in connecting to robot'}".replaceAll("'", "\""));
-                    }
-
-                    @Override
-                    public void onAuthenticationError(final AuthenticationException exception) {
-                        System.out.println("Exception: " + exception.getMessage());
-                        callbackContext
-                                .error("{'error': 'exception in connecting to robot'}".replaceAll("'", "\""));
-                    }
-
-                    @Override
-                    public void onDisconnect() {
-                        System.out.println("Disconnected");
-                    }
-                });
             } else {
                 cData.getRobartIoTCordovaPluginInstance().pairingCheckCounts = cData
                         .getRobartIoTCordovaPluginInstance().pairingCheckCounts + 1;
-                cData.getIotManager().checkPairedRobots(cData.getIotUserLogin()).subscribe(
-                        getCheckPairingOnNext(message, callbackContext, cData),
-                        getCheckPairingOnError(message, callbackContext, cData));
+                checkPairedRobots(message, callbackContext, cData);
             }
         };
     }
 
+    private void connectToRobot(final RobotImpl robot,
+                                final ConfigurationData cData,
+                                final CallbackContext callbackContext,
+                                final String message) {
+        final RobartIoTCordovaPlugin plugin = cData.getRobartIoTCordovaPluginInstance();
+
+        RobartSDKFactory.connectToRobot(robot, new ConnectionListener() {
+            @Override
+            public void onConnect() {
+                System.out.println("connected");
+
+                System.out.println("Connected to the robot #step 2.");
+                // RobartSDK.initialize(cData.getRobartIoTCordovaPluginInstance().cordova.getActivity().getApplicationContext());
+
+                if (plugin.firstTimeConfiguration) {
+                    System.out.println("first time configuration.");
+
+                    cData.getRobartIoTCordovaPluginInstance().justPaired = true;
+                    cData.initServer(cData.getRobartIoTCordovaPluginInstance());
+                    //AICUConnector.stopFindRobot();
+                    plugin.configureTime(message, callbackContext);
+                    callbackContext.success("{'response': 'Connected to the robot'}".replaceAll("'", "\""));
+                } else {
+                    System.out.println("not first time configuration.");
+
+                    cData.initServer(cData.getRobartIoTCordovaPluginInstance());
+                    plugin.configureTime(message, callbackContext);
+                    callbackContext.success("{'response': 'Connected to the robot'}".replaceAll("'", "\""));
+                }
+            }
+
+            @Override
+            public void onDisconnect() {
+                System.out.println("disconnected");
+
+            }
+
+            @Override
+            public void onConnectionError(Throwable throwable) {
+                System.out.println("Pairing, exception: " + throwable.getMessage());
+                callbackContext
+                        .error("{'error': 'exception in connecting to robot'}".replaceAll("'", "\""));
+
+            }
+
+            @Override
+            public void onAuthenticationError(AuthenticationException throwable) {
+                System.out.println("Exception: " + throwable.getMessage());
+                callbackContext
+                        .error("{'error': 'exception in connecting to robot'}".replaceAll("'", "\""));
+
+            }
+        });
+    }
+
     private void getFirmware(String message, CallbackContext callbackContext) {
         System.out.println("GetFirmware. Started");
-        String uniqueId =  RobartSDKFactory.getDefaultAICUConnector().getCurrentRobotId();
+        String uniqueId = RobartSDKFactory.getDefaultAICUConnector().getCurrentRobotId();
         System.out.println("GetFirmware. UniqueId: " + uniqueId);
 
         FirmwareManager firmwareManager = new FirmwareManagerImpl();
